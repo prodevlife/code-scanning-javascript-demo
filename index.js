@@ -85,6 +85,25 @@ exports.pack = function (cwd, opts) {
     fmode |= parseInt(222, 8)
   }
 
+  
+
+  var onlink = function () {
+    if (win32) return next() // skip links on win for now before it can be tested
+    xfs.unlink(name, function () {
+      var srcpath = path.resolve(cwd, header.linkname)
+
+      xfs.link(srcpath, name, function (err) {
+        if (err && err.code === 'EPERM' && opts.hardlinkAsFilesFallback) {
+          stream = xfs.createReadStream(srcpath)
+          return onfile()
+        }
+
+        stat(err)
+      })
+    })
+  }
+
+
   var onsymlink = function (filename, header) {
     xfs.readlink(path.join(cwd, filename), function (err, linkname) {
       if (err) return pack.destroy(err)
@@ -292,6 +311,7 @@ exports.extract = function (cwd, opts) {
 
         switch (header.type) {
           case 'file': return onfile()
+          case 'onlink': return onlink()
           case 'symlink': return onsymlink()
         }
 
